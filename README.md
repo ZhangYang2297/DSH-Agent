@@ -79,7 +79,7 @@ cd tools/mcp-ops && ./mcp-ops.exe --exporter 127.0.0.1:9100
 bash tools/prometheus/download_prometheus.sh   # once, ~115MB
 bash tools/prometheus/start_prometheus.sh
 
-# 5. Launch the web UI (start_dsh.sh auto-sets OPS_MCP_EXE for the MCP client)
+# 5. Launch the web UI (start_dsh.sh puts tools/mcp-ops on PATH so the MCP client finds mcp-ops.exe)
 bash start_dsh.sh --port 3080
 ```
 
@@ -89,8 +89,8 @@ Open `http://127.0.0.1:3080` and try:
 
 打开 `http://127.0.0.1:3080` 试一试用自然语言报障。
 
-> ⚠️ `cordis.patch.yml` 里的 MCP client 通过环境变量 `OPS_MCP_EXE` 定位 Go 采集器，
-> 用 `start_dsh.sh` 启动会自动设置；手动 `dsh web --patch ...` 时请先 `export OPS_MCP_EXE="$(pwd)/tools/mcp-ops/mcp-ops.exe"`。
+> ⚠️ `cordis.patch.yml` 里的 MCP client 用 `command: mcp-ops.exe`（只写文件名），由 `start_dsh.sh` 把 `tools/mcp-ops` 加入 `PATH` 来定位。
+> 手动 `dsh web --patch ...` 时请先 `export PATH="$(pwd)/tools/mcp-ops:$PATH"`。不要写 `command: !!js process.env.OPS_MCP_EXE`——dsh 不解析该表达式。
 
 ---
 
@@ -109,7 +109,7 @@ Open `http://127.0.0.1:3080` and try:
 deepseek-ops-assistant/
 ├── AGENTS.md                # Supervisor role definition 主管角色定义
 ├── cordis.patch.yml         # dsh config: model provider + expert + MCP client
-├── start_dsh.sh             # Launcher: sets OPS_MCP_EXE, starts dsh web
+├── start_dsh.sh             # Launcher: prepends tools/mcp-ops to PATH, starts dsh web
 ├── tools/
 │   ├── mcp-ops/             # Go collector (7 .go files + scripts) Go 采集器
 │   └── prometheus/          # Prometheus config, download & start scripts

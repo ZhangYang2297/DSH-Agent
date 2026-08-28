@@ -16,7 +16,7 @@
 # 1) 必须：换成你自己的火山方舟 API Key（见 §6）
 export ARK_API_KEY="ark-xxxxxxxx"
 
-# 2) 启动（脚本会自动设置 OPS_MCP_EXE，见 §3）
+# 2) 启动（脚本会自动把 tools/mcp-ops 加入 PATH，见 §3）
 bash start_dsh.sh
 # 打开 http://127.0.0.1:3080
 ```
@@ -92,7 +92,7 @@ dsh 用 Cordis 的「patch 分层配置」。本文件是**覆盖层**：在默�
       config:
         serverName: ops
         transport: stdio
-        command: !!js process.env.OPS_MCP_EXE   # 从环境变量读 Go 采集器路径（见 §6、§3）
+        command: mcp-ops.exe   # 只写文件名，目录由 start_dsh.sh 加入 PATH 解析（见 §3、§6）
         args: []
         reconnect:
           enabled: true
@@ -102,7 +102,8 @@ dsh 用 Cordis 的「patch 分层配置」。本文件是**覆盖层**：在默�
 ```
 
 > 作用：把 Go 写的 `mcp-ops` 监控工具注册成 `mcp__ops__*` 普通函数工具，主管和专家都能直接调。
-> `!!js process.env.OPS_MCP_EXE` 是 Cordis 的表达式写法，运行时读取环境变量 `OPS_MCP_EXE` 得到可执行文件路径——这就是「避免硬编码绝对路径、clone 后直接能跑」的关键。
+> `command: mcp-ops.exe` **只写文件名、不带路径**——可执行文件所在目录由 `start_dsh.sh` 加入 `PATH` 后解析。这就是「避免硬编码绝对路径、clone 后直接能跑」的关键。
+> ⚠️ 坑：`dsh` 的 patch YAML loader **不会解析** `!!js` 或 `${ENV}` 表达式（实测会变成字面量导致 MCP server 启动失败、工具不可用）。所以**不要**写 `command: !!js process.env.OPS_MCP_EXE`，用 PATH 方案代替。
 > 跨机部署（监控跑在别的机器）时，需要把 `transport` 改成 `streamable-http` 并改 `url`（见 §5）。
 
 ---
@@ -123,12 +124,12 @@ dsh 用 Cordis 的「patch 分层配置」。本文件是**覆盖层**：在默�
 
 做的事：
 
-1. 把 `OPS_MCP_EXE` 设成 `./tools/mcp-ops/mcp-ops.exe` 的绝对路径（供 cordis.patch.yml 的 `!!js process.env.OPS_MCP_EXE` 读取）
-2. 检查 `ARK_API_KEY` 是否设置，没设就警告
+1. 把 `tools/mcp-ops` 加入 `PATH`，使 cordis.patch.yml 里的 `command: mcp-ops.exe` 能按文件名找到（替代硬编码路径 / 失效的 `!!js` 写法）
+2. 检查 `ARK_API_KEY` 是否设置（`.env` 已自动载入），没设就警告
 3. `exec dsh web --patch ./cordis.patch.yml --no-open --port 3080` 启动 web
 
 > 用法：`bash start_dsh.sh [--port 3080]`。
-> 若不用这个脚本，必须自己 `export OPS_MCP_EXE=.../mcp-ops.exe`，否则 MCP 客户端启动失败、工具不可用。
+> 若不用这个脚本，必须自己 `export PATH="$(pwd)/tools/mcp-ops:$PATH"`，否则 dsh 找不到 mcp-ops.exe、MCP 客户端启动失败、工具不可用。
 
 ---
 
@@ -162,7 +163,7 @@ scrape_configs:
 | `collect_windows.go` / `network_windows.go` | 纯 Windows API 采集 | 默认采集本机资源/进程/网络；非 Windows 目标需另写采集实现 |
 
 > 三种运行形态：
-> - **本机 stdio（默认）**：`start_dsh.sh` 直接拉起，`command: !!js process.env.OPS_MCP_EXE`，无需 Prometheus 也能跑简单查询（进程/日志走 Go 直采）。
+> - **本机 stdio（默认）**：`start_dsh.sh` 直接拉起，`command: mcp-ops.exe`（靠 PATH 解析），无需 Prometheus 也能跑简单查询（进程/日志走 Go 直采）。
 > - **本机 + Prometheus**：先 `bash tools/prometheus/start_prometheus.sh`（需先 `download_prometheus.sh` 下载二进制），再 `start_dsh.sh`，`query_resource_usage` 走真实指标。
 > - **跨机 http**：监控机跑 `mcp-ops.exe --http`，dsh 侧把 §1.4 改成 `transport: streamable-http` + `url: http://监控机IP:PORT/mcp`，并改 §4 的 `targets` 指向监控机 exporter。
 
@@ -172,17 +173,19 @@ scrape_configs:
 
 | 变量 | 必须？ | 作用 | 在哪用 |
 |---|---|---|---|
-| `ARK_API_KEY` | **必须** | 火山方舟 API Key | cordis.patch.yml `apiKeyEnv`，模型请求鉴权 |
-| `OPS_MCP_EXE` | 必须（用脚本则自动） | `mcp-ops.exe` 绝对路径 | cordis.patch.yml `!!js process.env.OPS_MCP_EXE` |
+| `ARK_API_KEY` | **必须** | 火山方舟 API Key | cordis.patch.yml `apiKeyEnv`，模型请求鉴权（放 `.env` 由 start_dsh.sh 自动载入） |
+| `PATH`（含 `tools/mcp-ops`） | 必须（用脚本则自动） | 让 `command: mcp-ops.exe` 按文件名找到采集器 | start_dsh.sh 自动把 `tools/mcp-ops` 加入 PATH；手动跑 dsh 需自己 `export PATH=...` |
 | `DSH_HOME` | 可选 | dsh 会话/配置根目录 | 不设为默认 `~/.dsh`；多项目隔离可设成项目内 `.dsh_home` |
 
 设置示例：
 
 ```bash
 export ARK_API_KEY="ark-你的key"
-# OPS_MCP_EXE 由 start_dsh.sh 自动设；手动跑则：
-export OPS_MCP_EXE="$(pwd)/tools/mcp-ops/mcp-ops.exe"
+# 手动跑 dsh（不用 start_dsh.sh）时，需自己把采集器目录加入 PATH：
+export PATH="$(pwd)/tools/mcp-ops:$PATH"
 ```
+
+> 说明：早期版本用 `command: !!js process.env.OPS_MCP_EXE`，但实测 dsh 不解析该表达式，会导致 MCP server 启动失败。现统一改用 PATH 方案。
 
 ### 免 export 的做法：`.env` 自动载入  【推荐】
 

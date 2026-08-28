@@ -2,7 +2,7 @@
 # DSH-Agent 启动器（web 模式）
 #
 # 自动完成两件事：
-#   1. 设置 OPS_MCP_EXE 为当前项目 mcp-ops.exe 的绝对路径（供 cordis.patch.yml 使用）
+#   1. 把 tools/mcp-ops 加入 PATH，使 cordis.patch.yml 里的 command: mcp-ops.exe 能解析
 #   2. 启动 dsh web 模式
 #
 # 用法：bash start_dsh.sh [--port PORT]
@@ -21,15 +21,18 @@ fi
 PORT=3080
 [ "$1" = "--port" ] && PORT="$2"
 
-# ---- 检查 mcp-ops.exe ----
-MCP_EXE="$(pwd)/tools/mcp-ops/mcp-ops.exe"
+# ---- 检查 mcp-ops.exe 并加入 PATH ----
+# dsh 的 patch loader 不解析 !!js / ${ENV}，所以 cordis.patch.yml 里 command 写的是 mcp-ops.exe，
+# 这里把它所在目录加入 PATH，dsh 拉起 MCP server 时即可按文件名找到。
+MCP_DIR="$(pwd)/tools/mcp-ops"
+MCP_EXE="$MCP_DIR/mcp-ops.exe"
 if [ ! -f "$MCP_EXE" ]; then
   echo "错误：未找到 $MCP_EXE"
   echo "请先编译：cd tools/mcp-ops && go build -o mcp-ops.exe ."
   exit 1
 fi
-export OPS_MCP_EXE="$MCP_EXE"
-echo "OPS_MCP_EXE=$OPS_MCP_EXE"
+export PATH="$MCP_DIR:$PATH"
+echo "已将 $MCP_DIR 加入 PATH"
 
 # ---- 检查 ARK_API_KEY ----
 if [ -z "$ARK_API_KEY" ]; then
