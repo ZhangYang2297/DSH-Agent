@@ -1,0 +1,14 @@
+# 项目本地 Prometheus 配置
+# 抓取 mcp-ops 自研 exporter（/metrics，默认 127.0.0.1:9100）
+# mcp-ops 的 query_resource_usage 通过 PromQL 查这里。
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'mcp-ops'
+    static_configs:
+      - targets: ['127.0.0.1:9100']
+        labels:
+          # 本机节点标记为 web-01，方便测试时 host=web-01 能匹配到 instance 前缀
+          instance: 'web-01:9100'

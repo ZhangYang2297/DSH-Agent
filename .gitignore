@@ -1,0 +1,33 @@
+# ---- 编译产物 ----
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# ---- 运行时数据（Prometheus 时序数据、日志、PID）----
+tools/prometheus/data/
+tools/prometheus/prometheus-bin/
+*.log
+*.pid
+
+# ---- 凭据与本地配置（绝不提交）----
+.env
+.env.local
+*.pem
+*.key
+*.credentials.yaml
+
+# ---- 会话数据（dsh 会话在 DSH_HOME，若本项目内生成则忽略）----
+.dsh/
+sessions/
+*.zstd
+*.sqlite
+*.sqlite-shm
+
+# ---- 系统/编辑器 ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
