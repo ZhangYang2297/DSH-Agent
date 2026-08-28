@@ -9,6 +9,15 @@
 set -e
 cd "$(dirname "$0")"
 
+# ---- 自动载入 .env（若存在）----
+# 把 API Key 等敏感变量放 .env，避免每次手动 export；.env 已被 .gitignore 忽略，不会提交
+if [ -f "$(dirname "$0")/.env" ]; then
+  set -a
+  . "$(dirname "$0")/.env"
+  set +a
+  echo "已从 .env 载入环境变量"
+fi
+
 PORT=3080
 [ "$1" = "--port" ] && PORT="$2"
 

@@ -184,6 +184,16 @@ export ARK_API_KEY="ark-你的key"
 export OPS_MCP_EXE="$(pwd)/tools/mcp-ops/mcp-ops.exe"
 ```
 
+### 免 export 的做法：`.env` 自动载入  【推荐】
+
+项目根目录放一个 `.env`（已被 `.gitignore` 忽略，不会提交），内容：
+
+```bash
+ARK_API_KEY=ark-你的key
+```
+
+`start_dsh.sh` 启动时会自动 `source .env`，**下次直接 `bash start_dsh.sh` 即可，无需手动 export**。若你不用脚本、直接 `dsh` 命令启动，则仍需自己 `export`（或写进 shell 的 `~/.bashrc`）。
+
 ---
 
 ## 7. `.gitignore` 说明  【一般不动】
