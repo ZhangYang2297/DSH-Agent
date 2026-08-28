@@ -1,89 +1,136 @@
-# DSH-Agent —— 基于 DeepSeek Harness 的智能运维助手
+# DSH-Agent — AI Ops Assistant Built on DeepSeek Harness
 
-一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（dsh）构建的「主管 + 专家」智能运维助手。用户用自然语言报故障/查指标，系统自动路由到**主管**或**运维诊断专家**，用真实监控数据（自研 Go 采集器 + Prometheus）支撑结论。
+基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的智能运维助手。采用「主管 + 专家」两层架构：用户用自然语言报障/查指标，系统自动路由到主管或运维诊断专家，并由自研 Go 监控采集器 + Prometheus 提供**真实数据**支撑结论。
 
-## 架构
+An AI-powered Ops Assistant built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). It uses a "Supervisor + Expert" two-layer architecture: users report issues / query metrics in natural language, the system routes to a supervisor or the ops-diagnosis expert, and every conclusion is backed by **real data** from a self-built Go collector and Prometheus.
+
+---
+
+## Architecture / 架构
 
 ```
-用户问「web-01 CPU 为什么高」
+User: "web-01 CPU 为什么高" / "why is CPU high on web-01"
         │
         ▼
-┌─────────────────────────────────────────────┐
-│ 主管（glm/doubao，对话 + 意图路由 + 多轮记忆） │
-│   ├─ 简单查询 → 自己直接调 mcp__ops__* 工具    │
-│   └─ 复杂排障 → delegate_diagnosis 拉起专家    │
-└────────────┬────────────────────────────────┘
-             ▼
-┌─────────────────────────────────────────────┐
-│ 运维诊断专家（子代理：根因分析 + 排障报告）      │
-│   调 mcp__ops__query_resource_usage /        │
-│      query_process / query_logs              │
-└────────────┬────────────────────────────────┘
-             ▼
-┌─────────────────────────────────────────────┐
-│ Go 监控采集器（mcp-ops，自研）                │
-│   stdio / streamable-http 双通道 MCP          │
-│   数据源：Prometheus（CPU/内存/磁盘/网络）     │
-│           Windows API（进程）文件系统（日志）  │
-└─────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│ Supervisor (glm/doubao · dialogue + routing + memory)│
+│  ├─ Simple query  → calls mcp__ops__* directly      │
+│  └─ Complex fault → spawns expert via delegate_diagnosis
+└─────────────────────────┬──────────────────────────┘
+                          ▼
+┌────────────────────────────────────────────────────┐
+│ Ops Diagnosis Expert (subagent · root cause + report)│
+│   mcp__ops__query_resource_usage / query_process /  │
+│   query_logs                                        │
+└─────────────────────────┬──────────────────────────┘
+                          ▼
+┌────────────────────────────────────────────────────┐
+│ Go Collector (mcp-ops, self-built / 自研)            │
+│   MCP over stdio / streamable-http (dual channel)   │
+│   Sources: Prometheus (CPU/mem/disk/net),           │
+│            Windows API (process), filesystem (logs) │
+└────────────────────────────────────────────────────┘
 ```
 
-## 核心能力
+---
 
-- **主管 + 专家两层路由**：简单单点查询主管直接答；复杂排障（多工具、根因分析、处置建议）委派专家
-- **真实数据支撑**：自研 Go 采集器（纯 Windows API，无第三方依赖），指标走 Prometheus/PromQL
-- **领域 MCP 工具**（`mcp__ops__*`）：
-  - `query_resource_usage` — 节点 CPU/内存/磁盘/网络指标
-  - `query_process` — 进程枚举
-  - `query_logs` — 日志检索
-- **双通道部署**：stdio（同机）/ streamable-http（跨机）
-- **三层防护**：dsh 沙箱（read-only）防越权 + persona 数据来源纪律/安全红线 + 主管转述前证据检查
+## Features / 核心能力
 
-## 技术栈
-
-| 层 | 技术 |
+| 能力 Capability | 说明 Description |
 |---|---|
-| Agent 框架 | DeepSeek Harness（dsh）0.1.1-rc.2，Cordis 插件化 |
-| 大模型 | 火山方舟 Ark（OpenAI Responses 协议），默认 `glm-5-2-260617` |
-| 领域工具 | Go 1.26 + 官方 `modelcontextprotocol/go-sdk` |
-| 监控存储 | Prometheus 3.3.1（PromQL） |
-| 采集器 | 自研 `mcp-ops`（纯 Windows API） |
+| **Supervisor + Expert routing** 主管+专家路由 | Simple single-point queries answered by the supervisor directly; complex diagnostics (multi-tool, root-cause, remediation) delegated to the expert. 简单查询主管直接答，复杂排障委派专家 |
+| **Real data** 真实数据 | Self-built Go collector (pure Windows API, no third-party deps) + Prometheus/PromQL. 自研 Go 采集器（纯 Windows API）指标走 Prometheus |
+| **Domain MCP tools** 领域工具 | `mcp__ops__query_resource_usage` / `query_process` / `query_logs` |
+| **Dual-channel deploy** 双通道部署 | stdio (same host) / streamable-http (cross-host). 同机 stdio，跨机 HTTP |
+| **Triple protection** 三层防护 | dsh sandbox (read-only) + persona data-source discipline & safety red-line + supervisor evidence check before reporting. 沙箱防越权 + 提示词约束数据来源/危险操作 + 转述前证据检查 |
 
-## 快速开始
+---
+
+## Tech Stack / 技术栈
+
+| Layer 层 | Tech 技术 |
+|---|---|
+| Agent framework | DeepSeek Harness (dsh) 0.1.1-rc.2 · Cordis plugin architecture |
+| LLM | Volcano Ark (OpenAI Responses API) · default `glm-5-2-260617` |
+| Domain tools | Go 1.26 + official `modelcontextprotocol/go-sdk` v1.7.0 |
+| Metrics storage | Prometheus 3.3.1 (PromQL) |
+| Collector | self-built `mcp-ops` (pure Windows API) |
+
+---
+
+## Quick Start / 快速开始
 
 ```bash
-# 1. 安装 dsh（需 Node >= 22.19）
+# 1. Install dsh (Node >= 22.19 required)
 npm i -g @deepseek-ai/dsh
 
-# 2. 配置模型（编辑 cordis.patch.yml 或设环境变量）
-export ARK_API_KEY="你的火山方舟 API Key"
+# 2. Set your model API key (edit cordis.patch.yml or use env var)
+export ARK_API_KEY="your-ark-api-key"
 
-# 3. 编译 Go 采集器
+# 3. Build the Go collector
 cd tools/mcp-ops && go build -o mcp-ops.exe .
 
-# 4. 启动 Prometheus + exporter
-bash tools/prometheus/start_prometheus.sh   # 需先另开终端跑 mcp-ops --exporter
+# 4. Start Prometheus + exporter (two terminals)
+#    terminal A: start metrics exporter
+cd tools/mcp-ops && ./mcp-ops.exe --exporter 127.0.0.1:9100
+#    terminal B: start Prometheus
+bash tools/prometheus/start_prometheus.sh
 
-# 5. 启动 web 界面
+# 5. Launch the web UI
 dsh web --patch ./cordis.patch.yml --port 3080
 ```
 
-## 验证脚本
+Open `http://127.0.0.1:3080` and try:
+> 「帮我查一下 CPU」 → supervisor answers directly with real data
+> 「web-01 磁盘快满了，分析原因」 → expert runs root-cause diagnosis and outputs a structured report
 
-- `tools/prometheus/verify_promql.sh` — 同机 PromQL 链路验证
-- `tools/mcp-ops/verify_http.sh` — 跨机 streamable-http 验证
+打开 `http://127.0.0.1:3080` 试一试用自然语言报障。
 
-## 文档
+---
 
-| 文档 | 内容 |
+## Verification Scripts / 验证脚本
+
+| Script | Purpose 用途 |
 |---|---|
-| `PLAN.md` | 实施计划与里程碑 |
-| `DSH-开发指南.md` | 从零打造智能体的完整流程 |
-| `DSH-框架详解.md` | dsh 核心机制源码级拆解 |
-| `DSH-插件清单.md` | dsh 插件全量说明 |
-| `DSH-部署与分发.md` | 打包分发四种形态 |
-| `工具方案-Go监控采集器.md` | 领域工具方案与跨机架构 |
+| `tools/prometheus/verify_promql.sh` | Verify same-host PromQL chain 同机链路验证 |
+| `tools/mcp-ops/verify_http.sh` | Verify cross-host streamable-http 跨机部署验证 |
 
-## 许可证
+---
+
+## Project Layout / 目录结构
+
+```
+deepseek-ops-assistant/
+├── AGENTS.md                # Supervisor role definition 主管角色定义
+├── cordis.patch.yml         # dsh config: model provider + expert + MCP client
+├── tools/
+│   ├── mcp-ops/             # Go collector (7 .go files + scripts) Go 采集器
+│   └── prometheus/          # Prometheus config & scripts
+└── README.md
+```
+
+---
+
+## Cross-host Deployment / 跨机部署
+
+Deploy the collector on the target server and connect dsh remotely via streamable-http:
+采集器部署在被监控服务器，dsh 通过 streamable-http 远程连接：
+
+```yaml
+# on the target server / 目标服务器
+mcp-ops.exe --http 0.0.0.0:8000
+
+# dsh side config (cordis.patch.yml) / dsh 侧配置
+- id: mcp-ops
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: ops
+    transport: streamable-http
+    url: http://<SERVER_IP>:8000/mcp
+```
+
+---
+
+## License / 许可证
 
 MIT
