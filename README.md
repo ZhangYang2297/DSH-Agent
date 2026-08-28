@@ -60,24 +60,27 @@ User: "web-01 CPU 为什么高" / "why is CPU high on web-01"
 
 ## Quick Start / 快速开始
 
+> Prerequisites / 前置：Node >= 22.19, Go 1.22+, an Ark API Key
+
 ```bash
 # 1. Install dsh (Node >= 22.19 required)
 npm i -g @deepseek-ai/dsh
 
-# 2. Set your model API key (edit cordis.patch.yml or use env var)
+# 2. Set your model API key (via env var; key never stored in repo)
 export ARK_API_KEY="your-ark-api-key"
 
 # 3. Build the Go collector
-cd tools/mcp-ops && go build -o mcp-ops.exe .
+cd tools/mcp-ops && go build -o mcp-ops.exe . && cd ../..
 
-# 4. Start Prometheus + exporter (two terminals)
-#    terminal A: start metrics exporter
+# 4. Download & start Prometheus + metrics exporter (two terminals)
+#    terminal A: metrics exporter
 cd tools/mcp-ops && ./mcp-ops.exe --exporter 127.0.0.1:9100
-#    terminal B: start Prometheus
+#    terminal B: Prometheus (first run downloads the binary)
+bash tools/prometheus/download_prometheus.sh   # once, ~115MB
 bash tools/prometheus/start_prometheus.sh
 
-# 5. Launch the web UI
-dsh web --patch ./cordis.patch.yml --port 3080
+# 5. Launch the web UI (start_dsh.sh auto-sets OPS_MCP_EXE for the MCP client)
+bash start_dsh.sh --port 3080
 ```
 
 Open `http://127.0.0.1:3080` and try:
@@ -85,6 +88,9 @@ Open `http://127.0.0.1:3080` and try:
 > 「web-01 磁盘快满了，分析原因」 → expert runs root-cause diagnosis and outputs a structured report
 
 打开 `http://127.0.0.1:3080` 试一试用自然语言报障。
+
+> ⚠️ `cordis.patch.yml` 里的 MCP client 通过环境变量 `OPS_MCP_EXE` 定位 Go 采集器，
+> 用 `start_dsh.sh` 启动会自动设置；手动 `dsh web --patch ...` 时请先 `export OPS_MCP_EXE="$(pwd)/tools/mcp-ops/mcp-ops.exe"`。
 
 ---
 
@@ -103,9 +109,10 @@ Open `http://127.0.0.1:3080` and try:
 deepseek-ops-assistant/
 ├── AGENTS.md                # Supervisor role definition 主管角色定义
 ├── cordis.patch.yml         # dsh config: model provider + expert + MCP client
+├── start_dsh.sh             # Launcher: sets OPS_MCP_EXE, starts dsh web
 ├── tools/
 │   ├── mcp-ops/             # Go collector (7 .go files + scripts) Go 采集器
-│   └── prometheus/          # Prometheus config & scripts
+│   └── prometheus/          # Prometheus config, download & start scripts
 └── README.md
 ```
 

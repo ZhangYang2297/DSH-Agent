@@ -65,13 +65,14 @@
 
 # ---- 4. 运维监控 MCP 客户端：连接 Go 编写的监控采集器（T2）----
 # 把 tools/mcp-ops/mcp-ops.exe 的工具注册为 mcp__ops__* 普通 function 工具。
+# command 从环境变量 OPS_MCP_EXE 读取（用 start_dsh.sh 启动会自动设置），避免硬编码绝对路径。
 - insert:
     - id: mcp-ops
       name: '@deepseek-ai/dsh-mcp-client'
       config:
         serverName: ops
         transport: stdio
-        command: C:/Users/admin/WorkBuddy/2026-08-21-12-33-35/deepseek-ops-assistant/tools/mcp-ops/mcp-ops.exe
+        command: !!js process.env.OPS_MCP_EXE
         args: []
         reconnect:
           enabled: true
